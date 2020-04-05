@@ -1,6 +1,7 @@
 import requests
 import json
 import logging
+import functools
 
 from settings import COOKIE as COOKIE_STR
 
@@ -49,6 +50,19 @@ def request_to_curl_str(request):
 def cookie_dict_to_str(cookie_dict):
     return "; ".join([str(x)+"="+str(y) for x,y in cookie_dict.items()])
 
+
+def log_exception(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            res = func(*args, **kwargs)
+            return res
+        except Exception as e:
+            logger.exception(e)
+    return wrapper
+
+
+@log_exception
 def ping():
     BASE_URL = 'https://www.bigbasket.com/basket/?ver=2'
     # PING_URL = 'https://www.bigbasket.com/co/update-po/'
@@ -77,6 +91,7 @@ def ping():
     if resp_dict["error_code"] in [1000, 1005] and resp_dict["details"]["checkout_slot_failure_message"]:
         logger.info("PING_RESULT: FAILURE")
     else:
+        logger.info("PING_RESULT: SUCCESS")
         notify()
 
     # response = requests.get("https://www.bigbasket.com/account/me", cookies=COOKIE, headers=headers)
