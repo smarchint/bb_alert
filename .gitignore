@@ -1,0 +1,4 @@
+local_settings.py
+info.md
+*.log
+__pycache__
