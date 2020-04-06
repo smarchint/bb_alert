@@ -1,5 +1,5 @@
 # bb_alert
-slot availability pinger for bigbasket (during coronavirus duration)
+slot availability pinger for bigbasket (during coronavirus lockdown)
 
 + python 3.7
 + add cookie string in settings.py file
