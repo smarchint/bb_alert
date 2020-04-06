@@ -90,7 +90,7 @@ def ping():
     logger.info(f"{response.text}")
 
     resp_dict = response.json()
-    if resp_dict["error_code"] in [1000, 1005] and resp_dict["details"]["checkout_slot_failure_message"]:
+    if resp_dict["error_code"] in [1000, 1005] and resp_dict["details"].get("checkout_slot_failure_message"):
         logger.info("PING_RESULT: FAILURE")
     else:
         logger.info("PING_RESULT: SUCCESS")
