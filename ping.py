@@ -25,6 +25,8 @@ logger.addHandler(fh)
 logger.addHandler(ch)
 
 
+API_TIMEOUT = 20  # sec
+
 def notify():
     notify = Notify()
     notify.send('Bigbasket may be available. check it out NOW !!!')
@@ -84,7 +86,7 @@ def ping():
     headers['referer'] = 'https://www.bigbasket.com/co/checkout/?x=0&spni=12&addr=151568892'
 
     logger.info(f"\n {COOKIE} \n {headers}")
-    response = requests.get(PING_URL, cookies=COOKIE, headers=headers, timeout=5)
+    response = requests.get(PING_URL, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
     logger.info(f"{response.text}")
 
     resp_dict = response.json()
