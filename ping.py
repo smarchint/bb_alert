@@ -87,7 +87,7 @@ def ping():
     headers['referer'] = BASE_URL
 
     logger.info(f"\n {COOKIE} \n {headers}")
-    response = requests.get(PING_URL, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
+    # response = requests.get(PING_URL, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
     response = requests.post(PING_URL, data={"addr_id": ADDR_INT_ID}, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
     logger.info(f"{response.text}")
 
