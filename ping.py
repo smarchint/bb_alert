@@ -3,7 +3,7 @@ import json
 import logging
 import functools
 
-from settings import COOKIE as COOKIE_STR
+from settings import COOKIE as COOKIE_STR, ADDR_INT_ID
 
 from notify_run import Notify
 
@@ -67,8 +67,8 @@ def log_exception(func):
 @log_exception
 def ping():
     BASE_URL = 'https://www.bigbasket.com/basket/?ver=2'
-    # PING_URL = 'https://www.bigbasket.com/co/update-po/'
-    PING_URL = 'https://www.bigbasket.com/co/delivery-preferences-new/'
+    PING_URL = 'https://www.bigbasket.com/co/update-po/'
+    # PING_URL = 'https://www.bigbasket.com/co/delivery-preferences-new/'
     COOKIE = parse_cookie_to_dict(COOKIE_STR)
 
     response = requests.get(BASE_URL, cookies=COOKIE)
@@ -83,10 +83,12 @@ def ping():
     headers['x-requested-with'] =  'XMLHttpRequest'
     headers['user-agent'] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36"
     headers['origin'] = BASE_URL
-    headers['referer'] = 'https://www.bigbasket.com/co/checkout/?x=0&spni=12&addr=151568892'
+    # headers['referer'] = f'https://www.bigbasket.com/co/checkout/?x=0&spni=12&addr={ADDR_INT_ID}'
+    headers['referer'] = BASE_URL
 
     logger.info(f"\n {COOKIE} \n {headers}")
     response = requests.get(PING_URL, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
+    response = requests.post(PING_URL, data={"addr_id": ADDR_INT_ID}, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
     logger.info(f"{response.text}")
 
     resp_dict = response.json()
