@@ -3,7 +3,7 @@ import json
 import logging
 import functools
 
-from settings import COOKIE as COOKIE_STR, ADDR_INT_ID
+from settings import COOKIE as COOKIE_STR, ADDR_INT_ID, DEBUG
 
 from notify_run import Notify
 
@@ -17,7 +17,7 @@ fh.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.ERROR)
 # create formatter and add it to the handlers
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s  %(funcName)20s() - %(message)s')
 fh.setFormatter(formatter)
 ch.setFormatter(formatter)
 # add the handlers to the logger
@@ -26,6 +26,11 @@ logger.addHandler(ch)
 
 
 API_TIMEOUT = 20  # sec
+DELIVERY_PREFERENCE_API = "https://www.bigbasket.com/co/delivery-preferences-new/"
+UPDATE_PO_API = "https://www.bigbasket.com/co/update-po/"
+DEFAULT_API = DELIVERY_PREFERENCE_API
+BASE_URL = 'https://www.bigbasket.com/basket/?ver=2'
+
 
 def notify():
     notify = Notify()
@@ -39,6 +44,7 @@ def parse_cookie_to_dict(cookie):
         acc[k.strip()] = v.strip()
     return acc
 
+
 def request_to_curl_str(request):
     req = request
     command = "curl -X {method} -H {headers} -d '{data}' '{uri}'"
@@ -48,6 +54,7 @@ def request_to_curl_str(request):
     headers = ['"{0}: {1}"'.format(k, v) for k, v in req.headers.items()]
     headers = " -H ".join(headers)
     return command.format(method=method, headers=headers, data=data, uri=uri)
+
 
 def cookie_dict_to_str(cookie_dict):
     return "; ".join([str(x)+"="+str(y) for x,y in cookie_dict.items()])
@@ -64,13 +71,47 @@ def log_exception(func):
     return wrapper
 
 
-@log_exception
-def ping():
-    BASE_URL = 'https://www.bigbasket.com/basket/?ver=2'
-    # PING_URL = 'https://www.bigbasket.com/co/update-po/'
-    PING_URL = 'https://www.bigbasket.com/co/delivery-preferences-new/'
-    COOKIE = parse_cookie_to_dict(COOKIE_STR)
+def check_update_po(COOKIE, headers):
+    headers['referer'] = BASE_URL
+    response = requests.post(UPDATE_PO_API, data={"addr_id": ADDR_INT_ID}, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
+    try:
+        resp_dict = response.json()
+        logger.info(f"{UPDATE_PO_API} : {resp_dict}")
+        if resp_dict["status"] == "failure":
+            return False
+        return True
+    except Exception as e:
+        logger.warning(f"{UPDATE_PO_API} : {response.text}")
+        logger.exception(e)
+        return False
 
+
+def check_delivery_preferece(COOKIE, headers):
+    headers['referer'] = f'https://www.bigbasket.com/co/checkout/?x=0&spni=12&addr={ADDR_INT_ID}'
+    response = requests.get(DELIVERY_PREFERENCE_API, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
+    try:
+        resp_dict = response.json()
+        logger.info(f"{DELIVERY_PREFERENCE_API} : {resp_dict}")
+        if resp_dict["error_code"] in [1000, 1005] and resp_dict["details"].get("checkout_slot_failure_message"):
+            return False
+        return True
+    except Exception as e:
+        logger.warning(f"{DELIVERY_PREFERENCE_API} : {response.text}")
+        logger.exception(e)
+        return False
+
+
+def check_slot_availability(COOKIE, headers):
+    if check_update_po(COOKIE, headers):
+        if check_delivery_preferece(COOKIE, headers):
+            return True
+    return False
+
+
+@log_exception
+def ping(api="delivery-preferences-new"):
+    PING_URL = DELIVERY_PREFERENCE_API if DEFAULT_API == DELIVERY_PREFERENCE_API else UPDATE_PO_API
+    COOKIE = parse_cookie_to_dict(COOKIE_STR)
     response = requests.get(BASE_URL, cookies=COOKIE)
     COOKIE.update(response.cookies.get_dict())
     headers = {
@@ -83,21 +124,31 @@ def ping():
     headers['x-requested-with'] =  'XMLHttpRequest'
     headers['user-agent'] = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36"
     headers['origin'] = BASE_URL
-    # headers['referer'] = f'https://www.bigbasket.com/co/checkout/?x=0&spni=12&addr={ADDR_INT_ID}'
     headers['referer'] = BASE_URL
 
-    logger.info(f"\n {COOKIE} \n {headers}")
-    response = requests.get(PING_URL, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
-    # response = requests.post(PING_URL, data={"addr_id": ADDR_INT_ID}, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
-    logger.info(f"{response.text}")
+    # logger.info(f"\n {COOKIE} \n {headers}")
 
-    resp_dict = response.json()
-    if resp_dict["error_code"] in [1000, 1005] and resp_dict["details"].get("checkout_slot_failure_message"):
-    # if resp_dict["status"] in [0, "failure"]:
-        logger.info("PING_RESULT: FAILURE")
-    else:
+
+    '''
+    check-update-po:
+        if /update-po is failure : FAILURE end
+        else : /check-delivery-preference-new
+
+    check-delivery-preference-new:
+        if checkout_slot_failure_message exists: FAILURE
+        else SUCCESS
+    
+    observation:
+        update-po succeds when SLOTS_EXISTS ?? [toCHECK]
+    '''
+
+    if check_slot_availability(COOKIE, headers):
         logger.info("PING_RESULT: SUCCESS")
-        notify()
+        if not DEBUG:
+            notify()
+    else:
+        logger.info("PING_RESULT: FAILURE")
+
 
     # response = requests.get("https://www.bigbasket.com/account/me", cookies=COOKIE, headers=headers)
     # import pdb; pdb.set_trace()
