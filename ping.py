@@ -67,8 +67,8 @@ def log_exception(func):
 @log_exception
 def ping():
     BASE_URL = 'https://www.bigbasket.com/basket/?ver=2'
-    PING_URL = 'https://www.bigbasket.com/co/update-po/'
-    # PING_URL = 'https://www.bigbasket.com/co/delivery-preferences-new/'
+    # PING_URL = 'https://www.bigbasket.com/co/update-po/'
+    PING_URL = 'https://www.bigbasket.com/co/delivery-preferences-new/'
     COOKIE = parse_cookie_to_dict(COOKIE_STR)
 
     response = requests.get(BASE_URL, cookies=COOKIE)
@@ -87,12 +87,13 @@ def ping():
     headers['referer'] = BASE_URL
 
     logger.info(f"\n {COOKIE} \n {headers}")
-    # response = requests.get(PING_URL, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
-    response = requests.post(PING_URL, data={"addr_id": ADDR_INT_ID}, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
+    response = requests.get(PING_URL, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
+    # response = requests.post(PING_URL, data={"addr_id": ADDR_INT_ID}, cookies=COOKIE, headers=headers, timeout=API_TIMEOUT)
     logger.info(f"{response.text}")
 
     resp_dict = response.json()
-    if resp_dict["status"] == "failure":
+    if resp_dict["error_code"] in [1000, 1005] and resp_dict["details"].get("checkout_slot_failure_message"):
+    # if resp_dict["status"] in [0, "failure"]:
         logger.info("PING_RESULT: FAILURE")
     else:
         logger.info("PING_RESULT: SUCCESS")
